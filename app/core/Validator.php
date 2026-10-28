@@ -4,9 +4,11 @@ class Validator {
     private const RULES = [
         'required'  => [self::class, 'validateRequired'],
         'string'    => [self::class, 'validateString'],
+        'numeric'   => [self::class, 'validateNumeric'],
         'int'       => [self::class, 'validateInt'],
         'float'     => [self::class, 'validateFloat'],
         'email'     => [self::class, 'validateEmail'],
+        'uuid'      => [self::class, 'validateUuid'],
         'min'       => [self::class, 'validateMinMax'],
         'max'       => [self::class, 'validateMinMax'],
         'enum'      => [self::class, 'validateEnum'],
@@ -30,6 +32,8 @@ class Validator {
     ];
 
     private const PDF_MIME = 'application/pdf';
+
+    private const UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
 
     private static array $parsedRules = [];
 
@@ -58,6 +62,12 @@ class Validator {
         return is_string($data) && filter_var($data, FILTER_VALIDATE_EMAIL) !== false;
     }
 
+    protected static function validateUuid(mixed $data): bool {
+        return is_string($data)
+            && strlen($data) === 36
+            && preg_match(self::UUID_PATTERN, $data) === 1;
+    }
+
     protected static function validateMinMax(mixed $data, string $bound, int $length): bool {
         if (is_int($data) || is_float($data)) {
             $value = $data;
@@ -67,9 +77,7 @@ class Validator {
             return false;
         }
 
-        return $bound === 'min'
-            ? $value >= $length
-            : $value <= $length;
+        return $bound === 'min' ? $value >= $length : $value <= $length;
     }
 
     protected static function validateEnum(mixed $data, string $list): bool {
@@ -85,28 +93,16 @@ class Validator {
     }
 
     protected static function isFileList(array $data): bool {
-        if ($data === [] || !array_is_list($data)) {
-            return false;
-        }
-
+        if ($data === [] || !array_is_list($data)) return false;
         foreach ($data as $file) {
-            if (!is_array($file) || !isset($file['error'])) {
-                return false;
-            }
+            if (!is_array($file) || !isset($file['error'])) return false;
         }
-
         return true;
     }
 
     protected static function fileList(mixed $data): ?array {
-        if (!is_array($data) || $data === []) {
-            return null;
-        }
-
-        if (array_is_list($data)) {
-            return self::isFileList($data) ? $data : null;
-        }
-
+        if (!is_array($data) || $data === []) return null;
+        if (array_is_list($data)) return self::isFileList($data) ? $data : null;
         return isset($data['error']) ? [$data] : null;
     }
 
@@ -116,77 +112,48 @@ class Validator {
 
     protected static function validateImage(mixed $data): bool {
         $files = self::fileList($data);
-        if ($files === null) {
-            return false;
-        }
-
+        if ($files === null) return false;
         foreach ($files as $file) {
-            if (!str_starts_with((string) ($file['type'] ?? ''), 'image/')) {
-                return false;
-            }
+            if (!str_starts_with((string) ($file['type'] ?? ''), 'image/')) return false;
         }
-
         return true;
     }
 
     protected static function validateMime(mixed $data, string $list): bool {
         $files = self::fileList($data);
-        if ($files === null) {
-            return false;
-        }
-
+        if ($files === null) return false;
         $allowed = explode(',', $list);
-
         foreach ($files as $file) {
-            if (!in_array((string) ($file['type'] ?? ''), $allowed, true)) {
-                return false;
-            }
+            if (!in_array((string) ($file['type'] ?? ''), $allowed, true)) return false;
         }
-
         return true;
     }
 
     protected static function validateFileSize(mixed $data, string $bound, int $size): bool {
         $files = self::fileList($data);
-        if ($files === null) {
-            return false;
-        }
-
+        if ($files === null) return false;
         $isMin = $bound === 'min_size';
-
         foreach ($files as $file) {
             $fileSize = (int) ($file['size'] ?? 0);
-
-            if ($isMin ? $fileSize < $size : $fileSize > $size) {
-                return false;
-            }
+            if ($isMin ? $fileSize < $size : $fileSize > $size) return false;
         }
-
         return true;
     }
 
     protected static function validateFileCount(mixed $data, string $bound, int $count): bool {
         $files = self::fileList($data);
-        if ($files === null) {
-            return false;
-        }
-
-        return $bound === 'min_files'
-            ? count($files) >= $count
-            : count($files) <= $count;
+        if ($files === null) return false;
+        return $bound === 'min_files' ? count($files) >= $count : count($files) <= $count;
     }
 
     public static function validate(array $data, array $fieldAndRules): ?array {
         $errors = [];
-
         foreach ($fieldAndRules as $field => $rules) {
             $result = self::validateField($data[$field] ?? null, $rules);
-
             if ($result !== null) {
                 $errors[$field] = $result;
             }
         }
-
         return $errors === [] ? null : $errors;
     }
 
@@ -195,13 +162,8 @@ class Validator {
         $isEmpty = !$isRequired && !self::validateRequired($data);
 
         foreach ($rules as $rule => $message) {
-            if ($isEmpty && $rule !== 'required') {
-                return null;
-            }
-
-            if (!self::passes($data, $rule)) {
-                return $message;
-            }
+            if ($isEmpty && $rule !== 'required') return null;
+            if (!self::passes($data, $rule)) return $message;
         }
 
         return null;
@@ -209,34 +171,18 @@ class Validator {
 
     private static function passes(mixed $data, string $rule): bool {
         [$name, $argument] = self::$parsedRules[$rule] ??= self::parseRule($rule);
-
         $check = self::RULES[$name] ?? null;
-
-        if ($check === null) {
-            return true;
-        }
-
-        if ($argument === null) {
-            return $check($data);
-        }
-
-        if (isset(self::BOUND_RULES[$name])) {
-            return $check($data, $name, $argument);
-        }
-
+        if ($check === null) return true;
+        if ($argument === null) return $check($data);
+        if (isset(self::BOUND_RULES[$name])) return $check($data, $name, $argument);
         return $check($data, $argument);
     }
 
     private static function parseRule(string $rule): array {
         $separator = strpos($rule, ':');
-
-        if ($separator === false) {
-            return [$rule, null];
-        }
-
+        if ($separator === false) return [$rule, null];
         $name = substr($rule, 0, $separator);
         $value = substr($rule, $separator + 1);
-
-        return [$name, is_numeric($value) ? (int) $value : $value];
+        return [$name, ctype_digit($value) ? (int) $value : $value];
     }
 }
