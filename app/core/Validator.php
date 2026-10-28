@@ -1,158 +1,242 @@
 <?php declare(strict_types=1);
 
 class Validator {
-    // String Validation
-    protected static function requiredCheck(mixed $data): bool {
-        if(!isset($data) || is_null($data)) return false;
-        else if(is_string($data) && strlen(trim($data)) < 1) return false;
-        return true;
+    private const RULES = [
+        'required'  => [self::class, 'validateRequired'],
+        'string'    => [self::class, 'validateString'],
+        'int'       => [self::class, 'validateInt'],
+        'float'     => [self::class, 'validateFloat'],
+        'email'     => [self::class, 'validateEmail'],
+        'min'       => [self::class, 'validateMinMax'],
+        'max'       => [self::class, 'validateMinMax'],
+        'enum'      => [self::class, 'validateEnum'],
+        'pattern'   => [self::class, 'validatePattern'],
+        'pdf'       => [self::class, 'validatePdf'],
+        'image'     => [self::class, 'validateImage'],
+        'mime'      => [self::class, 'validateMime'],
+        'min_size'  => [self::class, 'validateFileSize'],
+        'max_size'  => [self::class, 'validateFileSize'],
+        'min_files' => [self::class, 'validateFileCount'],
+        'max_files' => [self::class, 'validateFileCount'],
+    ];
+
+    private const BOUND_RULES = [
+        'min'       => true,
+        'max'       => true,
+        'min_size'  => true,
+        'max_size'  => true,
+        'min_files' => true,
+        'max_files' => true,
+    ];
+
+    private const PDF_MIME = 'application/pdf';
+
+    private static array $parsedRules = [];
+
+    protected static function validateRequired(mixed $data): bool {
+        if (!isset($data)) return false;
+        return !(is_string($data) && trim($data) === '');
     }
 
-    protected static function emailCheck(mixed $data): bool {
-        if(filter_var($data, FILTER_VALIDATE_EMAIL)) return true;
-        return false;
+    protected static function validateString(mixed $data): bool {
+        return is_string($data);
     }
 
-    protected static function minmaxCheck(mixed $data, array $matches): bool {
-        $minmax = $matches[1];
-        $length = intval($matches[2]);
-
-        $is_numeric = is_int($data) || is_float($data);
-        $is_string = is_string($data);
-        $evaluatee = $is_numeric ? $data : ($is_string ? strlen($data) : null);
-
-        if(!($is_numeric || $is_string) || $evaluatee == null) return false;
-        else if($minmax == "min" && $evaluatee < $length) return false;
-        else if($minmax == "max" && $evaluatee > $length) return false;
-        return true;
+    protected static function validateNumeric(mixed $data): bool {
+        return is_numeric($data);
     }
 
-    protected static function enumCheck(mixed $data, array $matches): bool {
-        $list = explode(",", $matches[1]);
-
-        if(!is_string($data) || !in_array($data, $list)) return false;
-        return true;
+    protected static function validateInt(mixed $data): bool {
+        return is_int($data);
     }
 
-    protected static function patternCheck(mixed $data, array $matches): bool {
-        $pattern = "/$matches[1]/";
-
-        if(!is_string($data) || !preg_match($pattern, $data)) return false;
-        return true;
+    protected static function validateFloat(mixed $data): bool {
+        return is_float($data);
     }
 
-    // File Validation
-    protected static function minmaxFileCountCheck(mixed $data, array $matches): bool {
-        $minmax = $matches[1];
-        $length = intval($matches[2]);
-        if(!is_array($data["name"]) && $length == 1) return true; // ignore min/max, length 1 is absolutely in criteria
-        else if(is_array($data["name"]) && $minmax == "max") return count($data["name"]) <= $length;
-        else if(is_array($data["name"]) && $minmax == "min") return count($data["name"]) >= $length;
-        return false;
+    protected static function validateEmail(mixed $data): bool {
+        return is_string($data) && filter_var($data, FILTER_VALIDATE_EMAIL) !== false;
     }
 
-    protected static function minmaxSizeCheck(mixed $data, array $matches): bool {
-        $minmax = $matches[1];
-        $size = intval($matches[2]);
+    protected static function validateMinMax(mixed $data, string $bound, int $length): bool {
+        if (is_int($data) || is_float($data)) {
+            $value = $data;
+        } elseif (is_string($data)) {
+            $value = strlen($data);
+        } else {
+            return false;
+        }
 
-        if(!is_array($data["size"]) && $minmax == "min") return $data["size"] >= $size;
-        else if(!is_array($data["size"]) && $minmax == "max") return $data["size"] <= $size;
-        else if(is_array($data["size"]) && $minmax == "min") return min($data["size"]) >= $size;
-        else if(is_array($data["size"]) && $minmax == "max") return max($data["size"]) <= $size;
-        return false;
+        return $bound === 'min'
+            ? $value >= $length
+            : $value <= $length;
     }
 
-    protected static function isPdf($data): bool {
-        if(!is_array($data["type"]) && $data["type"] != "application/pdf") return false;
-        else if(is_array($data["type"])) {
-            foreach($data["type"] as $type) {
-                if($type != "application/pdf") return false;
+    protected static function validateEnum(mixed $data, string $list): bool {
+        return is_string($data) && in_array($data, explode(',', $list), true);
+    }
+
+    protected static function validatePattern(mixed $data, string $pattern): bool {
+        return is_string($data) && preg_match("/$pattern/", $data) === 1;
+    }
+
+    protected static function isFile(array $data): bool {
+        return !array_is_list($data) && isset($data['error']);
+    }
+
+    protected static function isFileList(array $data): bool {
+        if ($data === [] || !array_is_list($data)) {
+            return false;
+        }
+
+        foreach ($data as $file) {
+            if (!is_array($file) || !isset($file['error'])) {
+                return false;
             }
         }
+
         return true;
     }
 
-    protected static function isImage($data): bool {
-        if(!is_array($data["type"]) && substr($data["type"], 0, 6) != "image/") return false;
-        else if(is_array($data["type"])) {
-            foreach($data["type"] as $type) {
-                if(substr($type, 0, 6) != "image/") return false;
+    protected static function fileList(mixed $data): ?array {
+        if (!is_array($data) || $data === []) {
+            return null;
+        }
+
+        if (array_is_list($data)) {
+            return self::isFileList($data) ? $data : null;
+        }
+
+        return isset($data['error']) ? [$data] : null;
+    }
+
+    protected static function validatePdf(mixed $data): bool {
+        return self::validateMime($data, self::PDF_MIME);
+    }
+
+    protected static function validateImage(mixed $data): bool {
+        $files = self::fileList($data);
+        if ($files === null) {
+            return false;
+        }
+
+        foreach ($files as $file) {
+            if (!str_starts_with((string) ($file['type'] ?? ''), 'image/')) {
+                return false;
             }
         }
+
         return true;
     }
 
-    protected static function mimeCheck(mixed $data, array $matches): bool {
-        $list = explode(",", $matches[1]);
+    protected static function validateMime(mixed $data, string $list): bool {
+        $files = self::fileList($data);
+        if ($files === null) {
+            return false;
+        }
 
-        if(!is_array($data["type"]) && !in_array($data['type'], $list)) return false;
-        else if(is_array($data["type"])) {
-            foreach($data["type"] as $type) {
-                if(!in_array($type, $list)) return false;
+        $allowed = explode(',', $list);
+
+        foreach ($files as $file) {
+            if (!in_array((string) ($file['type'] ?? ''), $allowed, true)) {
+                return false;
             }
         }
+
         return true;
     }
 
-    // Validation method
-    public static function validate(mixed $data, array $rules): ?string {
-        $has_required = in_array("required", array_keys($rules));
+    protected static function validateFileSize(mixed $data, string $bound, int $size): bool {
+        $files = self::fileList($data);
+        if ($files === null) {
+            return false;
+        }
 
-        foreach($rules as $rule => $message) {
-            // Type Validation
-            if($rule == "required" && !self::requiredCheck($data)) return $message;
-            else if(!$has_required && (!isset($data) || is_null($data))) return null; // ignore if empty and not required
-            else if($rule == "string" && !is_string($data)) return $message;
-            else if($rule == "int" && !is_int($data)) return $message;
-            else if($rule == "float" && !is_float($data)) return $message;
-            // String Validation
-            else if($rule == "email" && !self::emailCheck($data)) return $message;
-            else if(preg_match("/^(min|max):(\d+)$/", $rule, $matches) && !self::minmaxCheck($data, $matches)) return $message;
-            else if(preg_match("/^enum:(.+)$/", $rule, $matches) && !self::enumCheck($data, $matches)) return $message;
-            else if(preg_match("/^pattern:(.+)$/", $rule, $matches) && !self::patternCheck($data, $matches)) return $message;
-            // File Validation
-            else if($rule == "pdf" && !self::isPdf($data)) return $message;
-            else if($rule == "image" && !self::isImage($data)) return $message;
-            else if(preg_match("/^mime:(.+)$/", $rule, $matches) && !self::mimeCheck($data, $matches)) return $message;
-            else if(preg_match("/^(min|max)_size:(\d+)$/", $rule, $matches) && !self::minmaxSizeCheck($data, $matches)) return $message;
-            else if(preg_match("/^(min|max)_files:(\d+)$/", $rule, $matches) && !self::minmaxFileCountCheck($data, $matches)) return $message;
+        $isMin = $bound === 'min_size';
+
+        foreach ($files as $file) {
+            $fileSize = (int) ($file['size'] ?? 0);
+
+            if ($isMin ? $fileSize < $size : $fileSize > $size) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    protected static function validateFileCount(mixed $data, string $bound, int $count): bool {
+        $files = self::fileList($data);
+        if ($files === null) {
+            return false;
+        }
+
+        return $bound === 'min_files'
+            ? count($files) >= $count
+            : count($files) <= $count;
+    }
+
+    public static function validate(array $data, array $fieldAndRules): ?array {
+        $errors = [];
+
+        foreach ($fieldAndRules as $field => $rules) {
+            $result = self::validateField($data[$field] ?? null, $rules);
+
+            if ($result !== null) {
+                $errors[$field] = $result;
+            }
+        }
+
+        return $errors === [] ? null : $errors;
+    }
+
+    private static function validateField(mixed $data, array $rules): ?string {
+        $isRequired = isset($rules['required']);
+        $isEmpty = !$isRequired && !self::validateRequired($data);
+
+        foreach ($rules as $rule => $message) {
+            if ($isEmpty && $rule !== 'required') {
+                return null;
+            }
+
+            if (!self::passes($data, $rule)) {
+                return $message;
+            }
         }
 
         return null;
     }
 
-    public static function validateAll(array $data, array $fieldAndRules): ?array {
-        $errorValidation = [];
+    private static function passes(mixed $data, string $rule): bool {
+        [$name, $argument] = self::$parsedRules[$rule] ??= self::parseRule($rule);
 
-        foreach($fieldAndRules as $field => $rules) {
-            $validationResult = self::validate($data[$field], $rules);
-            if($validationResult !== null) {
-                $errorValidation[$field] = $validationResult;
-            }
+        $check = self::RULES[$name] ?? null;
+
+        if ($check === null) {
+            return true;
         }
 
-        if(count($errorValidation) < 1) return null;
-        return $errorValidation;
+        if ($argument === null) {
+            return $check($data);
+        }
+
+        if (isset(self::BOUND_RULES[$name])) {
+            return $check($data, $name, $argument);
+        }
+
+        return $check($data, $argument);
     }
 
-    public static function fromHTTPRequest(array $fieldAndRules): ?array {
-        $errorValidation = [];
+    private static function parseRule(string $rule): array {
+        $separator = strpos($rule, ':');
 
-        foreach($fieldAndRules as $field => $rules) {
-            $is_file = strlen($field) > 5 && preg_match("/^file:(.+)$/", $field, $file_field_match);
-            $validationResult = self::validate(
-                $is_file
-                    ? ($_FILES[$file_field_match[1]] ?? null)
-                    : ($_REQUEST[$field] ?? null)
-                , $rules
-            );
-
-            if($validationResult !== null) {
-                $errorValidation[$is_file ? $file_field_match[1] : $field] = $validationResult;
-            }
+        if ($separator === false) {
+            return [$rule, null];
         }
 
-        if(count($errorValidation) < 1) return null;
-        return $errorValidation;
+        $name = substr($rule, 0, $separator);
+        $value = substr($rule, $separator + 1);
+
+        return [$name, is_numeric($value) ? (int) $value : $value];
     }
 }
