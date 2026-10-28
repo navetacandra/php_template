@@ -1,8 +1,10 @@
 RewriteEngine On
 
+# Block direct access to PHP file
+RewriteRule \.php$ - [F,END,NC]
+
 # Existing files/directories inside public/
-RewriteCond %{DOCUMENT_ROOT}/php_template/public/$1 -f [OR]
-RewriteCond %{DOCUMENT_ROOT}/php_template/public/$1 -d
+RewriteCond %{DOCUMENT_ROOT}/php_template/public/$1 -f
 RewriteRule ^(.+)$ public/$1 [END]
 
 # Everything else goes to the front controller
