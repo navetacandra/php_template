@@ -23,29 +23,71 @@ class Request {
     }
 
     public function all(): array {
-        return [...$_REQUEST, ...$_FILES];
-    }
+        $reqData = [...$_REQUEST];
 
-    public function get(string $field): mixed {
-        return $_GET[$field] ?? null;
-    }
+        foreach($_FILES as $k_file => $m_files) {
+            $reqData[$k_file] = [];
+            if(!is_array($m_files['error'])) {
+                $reqData[$k_file] = $m_files;
+                continue;
+            }
 
-    public function post(string $field): mixed {
-        return $_POST[$field] ?? null;
-    }
-
-    public function file(string $field): array {
-        $m_files = $_FILES[$field];
-        if(!is_array($m_files)) return $m_files;
-
-        $files = array();
-        $keys = array_keys($m_files);
-        for($i = 0; $i < count($m_files["name"]); $i++) {
-            foreach($keys as $k) {
-                $files[$i][$k] = $m_files[$k][$i];
+            $keys = array_keys($m_files);
+            $fileCount = count($m_files['error']);
+            for($i = 0; $i < $fileCount; $i++) {
+                foreach($keys as $k) {
+                    $reqData[$k_file][$i][$k] = $m_files[$k][$i];
+                }
             }
         }
 
-        return $files;
+        return $reqData;
+    }
+
+    public function get(string|array $field=''): mixed {
+        if($field == '') return $_GET;
+        if(is_string($field)) return $_GET[$field] ?? null;
+
+        $get = [];
+        foreach($field as $f) {
+            $get[$f] = $_GET[$f] ?? null;
+        }
+        return $get;
+    }
+
+    public function post(string|array $field=''): mixed {
+        if($field == '') return $_POST;
+        if(is_string($field)) return $_POST[$field] ?? null;
+
+        $post = [];
+        foreach($field as $f) {
+            $post[$f] = $_POST[$f] ?? null;
+        }
+        return $post;
+    }
+
+    public function file(string|array $field): array {
+        if(is_string($field)) {
+            $m_files = $_FILES[$field];
+            if(!is_array($m_files['error'])) return $m_files;
+
+            $files = [];
+            $keys = array_keys($m_files);
+            $fileCount = count($m_files['error']);
+            for($i = 0; $i < $fileCount; $i++) {
+                foreach($keys as $k) {
+                    $files[$i][$k] = $m_files[$k][$i];
+                }
+            }
+
+            return $files;
+        } else {
+            $files = [];
+            foreach($field as $f) {
+                $files[$f] = $this->file($f);
+            }
+
+            return $files;
+        }
     }
 }
