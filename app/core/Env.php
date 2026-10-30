@@ -3,6 +3,8 @@
 final class Env {
     public static function load(string $path) {
         if(!file_exists($path)) {
+            require __DIR__ . "/Log.php";
+
             Log::warn("env file doesn't exists");
             return;
         }
