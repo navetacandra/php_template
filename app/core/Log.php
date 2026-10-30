@@ -4,14 +4,17 @@ final class Log {
     // private const LOG_FILE = 'php://stderr'; // terminal
     private const LOG_FILE = __DIR__.'/../../storage/system.log'; // file
 
-    private static function log(string $level, string $message, array $details = []): void {
+    private static function log(string $level, mixed ...$message): void {
         global $requestId;
+
+        $msgs = [];
+        foreach($message as $msg) $msgs[] = print_r($msg, true);
+
         $context = [
             "level" => $level,
             "requestId" => $requestId ?? null,
             "timestamp" => date("Y-M-d H:i:s", time()),
-            "message" => $message,
-            "details" => $details,
+            "message" => join(" ", $msgs),
         ];
         $json = json_encode(
             $context,
@@ -25,15 +28,15 @@ final class Log {
         );
     }
 
-    public static function info(string $message, array $details = []): void {
-        self::log("INFO", $message, $details);
+    public static function info(mixed ...$message): void {
+        self::log("INFO", ...$message);
     }
 
-    public static function warn(string $message, array $details = []): void {
-        self::log("WARN", $message, $details);
+    public static function warn(mixed ...$message): void {
+        self::log("WARN", ...$message);
     }
 
-    public static function error(string $message, array $details = []): void {
-        self::log("ERROR", $message, $details);
+    public static function error(mixed ...$message): void {
+        self::log("ERROR", ...$message);
     }
 }
