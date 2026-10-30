@@ -16,10 +16,12 @@ class Cache {
         self::init();
 
         $m_path = self::$tmpDir . '/' . str_replace(':', '/', $key);
-        $dir = dirname($m_path);
-        mkdir($dir, 0755, true);
 
-        $filename = md5(basename($m_path));
+        $dir = dirname($m_path);
+        if(!str_contains($m_path, '*') && !is_dir($dir)) mkdir($dir, 0755, true);
+
+        $filename = basename($m_path);
+        $filename = $filename === '*' ? $filename : md5($filename);
         return $dir . "/$filename";
     }
 
@@ -34,7 +36,7 @@ class Cache {
         if(!is_array($cache) || !isset($cache['expires']) || !isset($cache['data'])) return null;
 
         if($cache['expires'] !== -1 && time() >= $cache['expires']) {
-            unlink($file);
+            @unlink($file);
             return null;
         }
 
@@ -52,14 +54,6 @@ class Cache {
         return file_put_contents($file, $cache, LOCK_EX) !== false;
     }
 
-    public static function getOrSet(string $key, string $data, int $ttl = 0): string {
-        $cached = self::get($key);
-        if($cached !== null) return $cached;
-
-        self::set($key, $data, $ttl);
-        return $data;
-    }
-
     public static function remember(string $key, int $ttl, callable $procedure): mixed {
         $cached = self::get($key);
         if($cached !== null) return json_decode($cached, true);
@@ -74,8 +68,14 @@ class Cache {
 
     public static function delete(string $key): bool {
         $file = self::getPath($key);
-        if(!is_file($file)) return true;
+        if(!is_file($file) && !str_contains($file, '*')) return true;
 
-        return unlink($file);
+        $matches = glob($file);
+        if($matches !== false) {
+            foreach($matches as $f) @unlink($f);
+            return true;
+        }
+
+        return false;
     }
 }
