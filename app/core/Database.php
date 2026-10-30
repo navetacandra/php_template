@@ -50,10 +50,16 @@ class DB {
         $pdo->rollBack();
     }
 
-    public static function query(string $sql="", array $parameter=[]): PDOStatement {
+    public static function query(string $sql="", array $parameter = [], array $types = []): PDOStatement {
         $pdo = self::getConnection();
         $stmt = $pdo->prepare($sql);
-        $stmt->execute($parameter);
+
+        foreach($parameter as $key => $val) {
+            $type = $types[$key] ?? PDO::PARAM_STR;
+            $stmt->bindValue($key, $val, $type);
+        }
+
+        $stmt->execute();
         return $stmt;
     }
 }
