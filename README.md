@@ -27,7 +27,7 @@ $router->get("/ping", fn () => Response::json([
 
 | Component | What it provides |
 |---|---|
-| **Router** | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`; `:param` segments; `*` wildcards; multiple handlers; form `_method` override; controller lazy-loading; subdirectory-aware `BASE_URL` |
+| **Router** | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, plus `all()`; `:param` segments; `*` wildcards; multiple handlers; form `_method` override; automatic `404`/`405`; controller lazy-loading; subdirectory-aware `BASE_URL` |
 | **Database** | Lazy persistent PDO singleton, `DB::query()` with bound parameters and optional PDO types, transactions |
 | **Repository** | Static CRUD base (`all`, `find`, `findOne`, `insert`, `update`, `delete`) configured by `$table` and `$fillable` |
 | **Service / Controller** | Minimal typed base classes enforcing an explicit `Controller → Service → Repository` layering |
@@ -82,7 +82,7 @@ cd php_template
    ```
 
 4. Add routes in `routes.php` and application classes under `app/`.
-   The bundled `routes.php`, `SampleController`, and `tes` view are demo files;
+   The bundled `routes.php` (`/` and `/ping`) and `tes` view are demo files;
    replace them with your application routes and classes. Controllers referenced
    as `["ControllerClass", "method"]` are loaded automatically by the router; only
    repositories, services, and optional core services (`Log`, `Storage`,

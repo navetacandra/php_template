@@ -716,8 +716,9 @@ not already been sent.
 
 Routes are registered on the `$router` instance in `routes.php`. `index.php`
 requires `routes.php` after creating `$router` and before calling `run()`.
-The bundled `routes.php`, `SampleController`, and `tes` view are demo files;
-replace or remove them when building your application.
+The bundled `routes.php` currently defines `/` (renders the `tes` view) and
+`/ping` (JSON response) as demo routes; replace or remove them when building
+your application.
 
 ```php
 // routes.php
@@ -736,9 +737,24 @@ $router->post(string $route, callable|array ...$handlers);
 $router->put(string $route, callable|array ...$handlers);
 $router->patch(string $route, callable|array ...$handlers);
 $router->delete(string $route, callable|array ...$handlers);
+
+// Register the same handlers for GET, POST, PUT, PATCH, and DELETE
+$router->all(string $route, callable|array ...$handlers);
 ```
 
-All registration methods return `void` and support multiple handlers.
+All registration methods return `void` and support multiple handlers. Routes are
+stored by path: registering the same path with different methods adds those
+methods to one route entry. Registering the same path **and** method again
+silently replaces the previous handlers.
+
+```php
+$router->get("/users",  ["UserController", "index"]);
+$router->post("/users", ["UserController", "store"]);
+// One "/users" entry with GET and POST handlers.
+
+$router->all("/health", fn () => Response::json(["status" => "ok"]));
+// GET, POST, PUT, PATCH, and DELETE all use the same handler.
+```
 
 ### Handlers
 
@@ -814,15 +830,22 @@ $router->get("/files/*", function (Request $request, array $params) {
 |---|---|
 | Supported verbs | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` |
 | Method override | On `POST`, a form field `_method=PUT\|PATCH\|DELETE` changes the dispatched verb |
-| Matching order | Exact path check first per route, then regex; the first matching route wins |
-| Registration order | Route order is preserved; register static paths before parameterized ones |
+| Matching order | Exact path check first per route, then regex; the first path match wins |
+| Method lookup | After a path matches, the requested method's handlers are looked up |
+| Registration order | Path order is preserved; register static paths before parameterized ones |
 | Anchoring | Patterns are anchored with `^...$`; trailing slashes must match exactly |
 | Existing files | For `GET`, if the path maps to an existing file under the project root, `run()` returns `false` |
-| No match | `http_response_code(404)` with an empty body |
-| Wrong method | Also `404`; there is no automatic `405 Method Not Allowed` |
+| No path match | `http_response_code(404)` with an empty body |
+| Path matches, method missing | `http_response_code(405)` and `exit` |
+
+Because the method is checked only **after** a path matches, a path match for an
+unregistered method returns `405` immediately. The router does not continue
+searching for a later parameterized route that might have that method.
 
 The method override only reads `$_POST["_method"]`; it does not inspect a JSON
-body or an `X-HTTP-Method-Override` header.
+body or an `X-HTTP-Method-Override` header. `HEAD`, `OPTIONS`, and other verbs are
+not registered by the built-in helpers; if their path exists they produce `405`,
+otherwise `404`.
 
 ### Pattern compilation caveats
 
@@ -851,8 +874,9 @@ caveat.
 ### Router return value
 
 - Existing GET file: returns `false`.
-- Matched route: returns the handler result (usually `null`).
-- No match: returns the result of `http_response_code(404)`.
+- Matched path and method: returns the handler result (usually `null`).
+- Matched path, missing method: sends `405` and exits.
+- No path match: returns the result of `http_response_code(404)`.
 
 `index.php` ignores the return value. Static `public/` files are normally served
 by the `.htaccess` rewrite rule before PHP is invoked.
@@ -1622,10 +1646,11 @@ files; use Apache when testing the public-file setup.
 13. **Routing has no middleware, groups, or named routes** — use multiple
     handlers. Handlers receive one shared `Request` instance per dispatch.
 
-14. **Route matching is first-match and pattern-based** — register static paths
-    before parameterized ones. `/users/me` after `/users/:id` will never match.
-    Patterns are anchored; trailing slashes matter. Unsupported methods and
-    unmatched paths both return `404`, never `405`.
+14. **Route matching is first-path-match and pattern-based** — register static
+    paths before parameterized ones. `/users/me` after `/users/:id` will never
+    match. Patterns are anchored; trailing slashes matter. A matched path with an
+    unregistered method returns `405`; an unmatched path returns `404`.
+    Registering the same path/method again replaces its handlers.
 
 15. **Route patterns are not `preg_quote`d** — regex metacharacters in literal
     paths are active. Dots are not escaped due to the current compilation code.
