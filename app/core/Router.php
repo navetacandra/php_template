@@ -43,9 +43,7 @@ class Router {
                 $className = $handler[0];
                 $action = $handler[1];
 
-                // load controller by name
-                require_once __DIR__ . "/../controllers/$className.php";
-                // init controller class and execute action
+                require __DIR__ . "/../controllers/$className.php";
                 (new $className())->$action($req, $params);
             }
         }

@@ -7,6 +7,12 @@ class Response {
         }
     }
 
+    public static function text(string $data, int $status = 200) {
+        static::status($status);
+        header("Content-Type: text/plain");
+        print_r($data);
+    }
+
     public static function json(array $data, int $status = 200) {
         static::status($status);
         header("Content-Type: application/json");
