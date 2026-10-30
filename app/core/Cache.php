@@ -26,7 +26,7 @@ class Cache {
         $content = file_get_contents($file);
         if($content === false) return null;
 
-        $cache = json_decode($content);
+        $cache = json_decode($content, true);
         if(!is_array($cache) || !isset($cache['expires']) || !isset($cache['data'])) return null;
 
         if($cache['expires'] !== -1 && time() >= $cache['expires']) {
