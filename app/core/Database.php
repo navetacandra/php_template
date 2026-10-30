@@ -13,9 +13,12 @@ class DB {
 
         $dsn = "$driver:host=$host;port=$port;dbname=$dbname";
         try {
-            $pdo = new PDO($dsn, $user, $pass);
-            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+            $pdo = new PDO($dsn, $user, $pass, [
+               PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+               PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+               PDO::ATTR_PERSISTENT         => true
+            ]);
+
             self::$pdo = $pdo;
         } catch(PDOException $e) {
             Log::error("PDO connection failed.", [
