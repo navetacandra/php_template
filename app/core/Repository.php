@@ -1,8 +1,8 @@
 <?php declare(strict_types=1);
 
 class Repository {
-    private static string $table = "example";
-    private static array $fillable = [];
+    protected static string $table = "example";
+    protected static array $fillable = [];
 
     protected static function buildWhereClause(array &$data): array {
         $conditions = [];
@@ -55,6 +55,27 @@ class Repository {
         $params = implode(", ", array_map(fn ($col) => ":$col", $keys));
 
         return DB::query("INSERT INTO $table ($cols) VALUES ($params)", $data);
+    }
+
+    public static function insertMany(array $data): ?PDOStatement {
+        if(!is_array($data) || !array_is_list($data)) return null;
+
+        $keys = array_keys($data[0]);
+        $placeholder = implode(", ", array_map(fn () => "?", $keys));
+        static::assertFillable($keys, 'insert');
+
+        $table = static::$table;
+        $cols = implode(", ", $keys);
+        $params = [];
+        $values = [];
+
+        foreach($data as $row) {
+            $params[] = "($placeholder)";
+            array_push($values, ...array_values($row));
+        }
+
+        $params = join(', ', $params);
+        return DB::query("INSERT INTO $table ($cols) VALUES $params", $values);
     }
 
     public static function update(array $data, array $condition): PDOStatement {

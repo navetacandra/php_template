@@ -11,8 +11,11 @@ class DB {
         $user = $_ENV["DB_USER"];
         $pass = $_ENV["DB_PASS"];
 
-        if($driver === "sqlite") $dsn = "$driver:$dbname";
-        else $dsn = "$driver:host=$host;port=$port;dbname=$dbname";
+
+        if($driver === "sqlite") {
+            $sqliteFile = __DIR__ . "/../../$dbname";  // project root
+            $dsn = "$driver:$sqliteFile";
+        } else $dsn = "$driver:host=$host;port=$port;dbname=$dbname";
 
         try {
             $pdo = new PDO($dsn, $user, $pass, [
@@ -59,8 +62,10 @@ class DB {
         $stmt = $pdo->prepare($sql);
 
         foreach($parameter as $key => $val) {
-            $type = $types[$key] ?? PDO::PARAM_STR;
-            $stmt->bindValue($key, $val, $type);
+            $type = $types[$key] ?? (
+                ctype_digit("$val") ? PDO::PARAM_INT : PDO::PARAM_STR
+            );
+            $stmt->bindValue(is_int($key) ? $key + 1 : $key, $val, $type);
         }
 
         $stmt->execute();
