@@ -24,6 +24,15 @@ class Router {
         return [$fields, "/^$routePattern$/"]; // compile to valid pattern
     }
 
+    protected static function getHandler(array $route, string $method): ?array {
+        if(!isset($route[$method])) {
+            http_response_code(405);
+            exit;
+        }
+
+        return $route[$method];
+    }
+
     protected static function callHandlers(array $m_handlers, array $params = []) {
         $req = new Request();
 
@@ -43,15 +52,18 @@ class Router {
     }
 
     private function add(string $method, string $route, callable|array ...$handlers) {
-        if(!isset($this->routes[$method])) $this->routes[$method] = [];
+        if(isset($this->routes[$route])) {
+            $this->routes[$route][$method] = $handlers;
+            return;
+        }
 
         $pattern = static::compilePattern($route);
-        $this->routes[$method][] = [
-           "pattern_field" => $pattern[0],
-           "pattern" => $pattern[1],
-           "handlers" => $handlers,
-           "path" => $route
-       ];
+        $this->routes[$route] = [
+            "pattern_field" => $pattern[0],
+            "pattern" => $pattern[1],
+            "path" => $route,
+            $method => $handlers,
+        ];
     }
 
     public function get(string $route, callable|array ...$handlers) {
@@ -72,6 +84,14 @@ class Router {
 
     public function delete(string $route, callable|array ...$handlers) {
         $this->add("DELETE", $route, ...$handlers);
+    }
+
+    public function all(string $route, callable|array ...$handlers) {
+        $this->get($route, ...$handlers);
+        $this->post($route, ...$handlers);
+        $this->put($route, ...$handlers);
+        $this->patch($route, ...$handlers);
+        $this->delete($route, ...$handlers);
     }
 
     public function run() {
@@ -102,13 +122,13 @@ class Router {
         define("BASE_URL", $base);
         $this->path = $path;
 
-        // // Find match url
-        foreach($this->routes[$method] as $route) {
-            $m_path = $route["path"];
-            $handlers = $route["handlers"];
+        // Find match url
+        foreach($this->routes as $m_path => $route) {
             $pattern = $route["pattern"];
             if($m_path == $path) {
-                return static::callHandlers($handlers);
+                return static::callHandlers(
+                    static::getHandler($route, $method)
+                );
             }
 
             if(preg_match($pattern, $path, $matches)) {
@@ -118,7 +138,10 @@ class Router {
                     $params[$field] = $matches[$i];
                 }
 
-                return static::callHandlers($handlers, $params);
+                return static::callHandlers(
+                    static::getHandler($route, $method),
+                    $params
+                );
             }
         }
 
