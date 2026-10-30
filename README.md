@@ -32,7 +32,7 @@ $router->get("/ping", fn () => Response::json([
 | **Repository** | Static CRUD base (`all`, `find`, `findOne`, `insert`, `update`, `delete`) configured by `$table` and `$fillable` |
 | **Service / Controller** | Minimal typed base classes enforcing an explicit `Controller → Service → Repository` layering |
 | **Request** | Query/post access, JSON body decoding, headers, uploaded files, merged request data |
-| **Response / Views** | JSON, redirects, status codes, and plain-PHP view rendering from `app/views` |
+| **Response / Views** | Plain text, JSON, redirects, status codes, and plain-PHP view rendering from `app/views` |
 | **Validator** | Rule/message maps for strings, numbers, e-mail, UUIDs, enums, patterns, and file uploads |
 | **Storage** | File helpers rooted at the project `storage/` directory |
 | **Cache** | File-backed cache with TTL, `remember()`, and wildcard deletion |
@@ -123,7 +123,7 @@ Full API documentation: **[DOCS.md](DOCS.md)**.
         ├── Service.php       # Service — base service
         ├── Controller.php    # Controller — base controller
         ├── Request.php       # Request — HTTP input
-        ├── Response.php      # Response — JSON/redirect/view
+        ├── Response.php      # Response — text/JSON/redirect/view
         ├── Router.php        # Router — routing and dispatch
         └── Cache.php         # Cache — file cache (required manually)
 ```
@@ -141,8 +141,8 @@ Route → Controller → Service → Repository → DB (PDO)
 3. A `Router` is created and `routes.php` registers routes on it.
 4. `$router->run()` resolves the method and path, defines `BASE_URL`, extracts
    route parameters, and invokes the matching handler(s).
-5. Handlers build a `Response` (`json()`, `redirect()`, or `render()`) or return
-   data to the next handler.
+5. Handlers build a `Response` (`text()`, `json()`, `redirect()`, or `render()`)
+   or return data to the next handler.
 
 The default bootstrap loads `Env`, `DB`, the base layers, and the HTTP classes.
 `Log`, `Storage`, `Validator`, and `Cache` are optional and must be

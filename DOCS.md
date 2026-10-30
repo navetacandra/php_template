@@ -108,7 +108,7 @@ HTTP request
       → instantiate Request once
       → invoke handlers in order
           → Controller → Service → Repository → DB
-          → Response::json/redirect/render
+          → Response::text/json/redirect/render
   → response sent
 ```
 
@@ -237,14 +237,18 @@ lazily by the router:
 
 ```php
 // Router internals
-require_once __DIR__ . "/../controllers/$className.php";
+require __DIR__ . "/../controllers/$className.php";
 (new $className())->$action($request, $params);
 ```
 
 Therefore controllers used as `["UserController", "store"]` do **not** need to
-be required in `index.php` or `routes.php`; the router requires them at dispatch
+be required in `index.php` or `routes.php`; the router loads them at dispatch
 time. The file name must match the class name exactly: `UserController` →
 `app/controllers/UserController.php`.
+
+The router uses `require`, not `require_once`. Do not reference the same
+controller class twice in one route's handler list, because the second `require`
+would attempt to declare the class again.
 
 ### Repositories and services
 
@@ -637,13 +641,15 @@ as `$params`.
 ## 8. HTTP Output & Views — `Response`
 
 `Response` is the single response API. `json()` and `redirect()` terminate the
-request with `exit`; `render()` outputs a view and returns normally.
+request with `exit`; `text()` writes a plain-text body and returns, and
+`render()` outputs a view and returns normally.
 
 ### API
 
 | Method | Signature | Behavior |
 |---|---|---|
 | `status` | `status(int $status)` | Sets the HTTP status code if headers are not already sent |
+| `text` | `text(string $data, int $status = 200)` | Sets `Content-Type: text/plain`, prints the string with `print_r()`, returns |
 | `json` | `json(array $data, int $status = 200)` | Sets `Content-Type: application/json`, echoes `json_encode($data)`, exits |
 | `redirect` | `redirect(string $dest, int $status = 302)` | Sets `Location: $dest`, exits |
 | `render` | `render(string $view, array $data = [], int $status = 200)` | Includes `app/views/<view>.view.php` |
@@ -657,6 +663,17 @@ Response::json(["status" => "error", "message" => "Not found"], 404);
 
 Only arrays are accepted. There are no JSON encoding flags or options, so
 slashes are escaped with PHP's defaults.
+
+### Plain text
+
+```php
+Response::text("pong\r\n");
+Response::text("Created", 201);
+```
+
+`text()` sets `Content-Type: text/plain`, passes the string through
+`print_r()`, and returns without calling `exit`. If it is used in a route with
+additional handlers, those handlers will continue to run.
 
 ### Redirect
 
@@ -708,7 +725,8 @@ Response::render("sample", ["title" => "Hello"]);
 
 `render()` does not exit and does not use output buffering or a layout system.
 The status and `Content-Type: text/html` header are set only when headers have
-not already been sent.
+not already been sent. Like `text()`, it returns to the router and allows later
+handlers to run.
 
 ---
 
@@ -717,8 +735,8 @@ not already been sent.
 Routes are registered on the `$router` instance in `routes.php`. `index.php`
 requires `routes.php` after creating `$router` and before calling `run()`.
 The bundled `routes.php` currently defines `/` (renders the `tes` view) and
-`/ping` (JSON response) as demo routes; replace or remove them when building
-your application.
+`/ping` (an `all()` route returning plain text) as demo routes; replace or
+remove them when building your application.
 
 ```php
 // routes.php
@@ -776,8 +794,8 @@ $router->get("/ping", fn (Request $request, array $params) =>
 ```
 
 Handlers run in registration order. `Response::json()` and `Response::redirect()`
-exit, so later handlers do not run. `Response::render()` and ordinary handlers
-return, allowing the next handler to execute:
+exit, so later handlers do not run. `Response::text()`, `Response::render()`, and
+ordinary handlers return, allowing the next handler to execute:
 
 ```php
 $router->get("/dashboard", $auth, $loadUser, fn () => Response::render("dashboard"));
@@ -1589,8 +1607,10 @@ files; use Apache when testing the public-file setup.
 
 1. **No autoloader and no namespaces** — repositories/services must be
    `require_once`d manually; controllers are loaded by the router by exact class
-   name. `Log`, `Storage`, `Validator`, and `Cache` are **not** loaded by the
-   default bootstrap and must be required explicitly.
+   name using `require` (not `require_once`), so do not list the same controller
+   class twice in one route's handlers. `Log`, `Storage`, `Validator`, and
+   `Cache` are **not** loaded by the default bootstrap and must be required
+   explicitly.
 
 2. **Explicit boot order matters** — the default bootstrap loads `Env`, `DB`,
    the base layers, then the HTTP classes. `Database` needs the PDO extension;
@@ -1641,7 +1661,8 @@ files; use Apache when testing the public-file setup.
     - Unknown rules pass silently.
 
 12. **`Response::json()` and `redirect()` exit** — call them as the final
-    statement. `render()` outputs and returns, so execution can continue.
+    statement. `text()` and `render()` output and return, so later handlers can
+    continue running.
 
 13. **Routing has no middleware, groups, or named routes** — use multiple
     handlers. Handlers receive one shared `Request` instance per dispatch.
