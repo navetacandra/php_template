@@ -72,7 +72,11 @@ class Cache {
 
         $matches = glob($file);
         if($matches !== false) {
-            foreach($matches as $f) @unlink($f);
+            foreach($matches as $match) {
+                if(is_file($match)) @unlink($match);
+                elseif(is_dir($match)) @rmdir($match);
+            }
+
             return true;
         }
 

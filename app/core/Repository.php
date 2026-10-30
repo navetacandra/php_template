@@ -1,10 +1,10 @@
 <?php declare(strict_types=1);
 
 class Repository {
-    protected static string $table = "example";
-    protected static array $fillable = [];
+    private static string $table = "example";
+    private static array $fillable = [];
 
-    private static function buildWhereClause(array &$data): array {
+    protected static function buildWhereClause(array &$data): array {
         $conditions = [];
         $params = [];
         foreach($data as $col => $val) {
@@ -21,7 +21,7 @@ class Repository {
         return [implode(" AND ", $conditions), $params];
     }
 
-    private static function assertFillable(array &$keys, string $action): bool {
+    protected static function assertFillable(array &$keys, string $action): bool {
         $diff = array_diff($keys, static::$fillable);
         if(count($diff) == 0) return true;
 
