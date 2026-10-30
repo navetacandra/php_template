@@ -15,8 +15,12 @@ class Cache {
     private static function getPath(string $key): string {
         self::init();
 
-        $filename = md5($key);
-        return self::$tmpDir . "/$filename";
+        $m_path = self::$tmpDir . '/' . str_replace(':', '/', $key);
+        $dir = dirname($m_path);
+        mkdir($dir, 0755, true);
+
+        $filename = md5(basename($m_path));
+        return $dir . "/$filename";
     }
 
     public static function get(string $key): ?string {
@@ -54,6 +58,18 @@ class Cache {
 
         self::set($key, $data, $ttl);
         return $data;
+    }
+
+    public static function remember(string $key, int $ttl, callable $procedure): mixed {
+        $cached = self::get($key);
+        if($cached !== null) return json_decode($cached, true);
+
+        $value = $procedure();
+        $encoded = json_encode($value);
+        if($encoded === false) return $value;
+
+        self::set($key, $encoded, $ttl);
+        return $value;
     }
 
     public static function delete(string $key): bool {
