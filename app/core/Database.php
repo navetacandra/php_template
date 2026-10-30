@@ -11,7 +11,9 @@ class DB {
         $user = $_ENV["DB_USER"];
         $pass = $_ENV["DB_PASS"];
 
-        $dsn = "$driver:host=$host;port=$port;dbname=$dbname";
+        if($driver === "sqlite") $dsn = "$driver:$dbname";
+        else $dsn = "$driver:host=$host;port=$port;dbname=$dbname";
+
         try {
             $pdo = new PDO($dsn, $user, $pass, [
                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
