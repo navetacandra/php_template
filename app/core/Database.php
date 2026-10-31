@@ -17,21 +17,13 @@ class DB {
             $dsn = "$driver:$sqliteFile";
         } else $dsn = "$driver:host=$host;port=$port;dbname=$dbname";
 
-        try {
-            $pdo = new PDO($dsn, $user, $pass, [
-               PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-               PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-               PDO::ATTR_PERSISTENT         => true
-            ]);
+        $pdo = new PDO($dsn, $user, $pass, [
+           PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+           PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+           PDO::ATTR_PERSISTENT         => true
+        ]);
 
-            self::$pdo = $pdo;
-        } catch(PDOException $e) {
-            require __DIR__ . "/Log.php";
-
-            Log::error("PDO connection failed.", $e->getMessage());
-            http_response_code(502);
-            die();
-        }
+        self::$pdo = $pdo;
     }
 
     protected static function getConnection(): ?PDO {

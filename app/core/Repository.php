@@ -10,7 +10,7 @@ class Repository {
         foreach($data as $col => $val) {
             if(is_array($val)) {
                 [$operator, $value] = $val;
-                $conditions[] = "$col $operator $value";
+                $conditions[] = "$col $operator :$col";
                 $params[$col] = $value;
             } else {
                 $conditions[] = "$col = :$col";
@@ -40,10 +40,17 @@ class Repository {
         return DB::query("SELECT * FROM $table WHERE $whereClause", $params)->fetchAll();
     }
 
-    public static function findOne(array $data): array {
+    public static function findOne(array $data): array|false {
         $table = static::$table;
         [$whereClause, $params] = static::buildWhereClause($data);
         return DB::query("SELECT * FROM $table WHERE $whereClause LIMIT 1", $params)->fetch();
+    }
+
+    public static function exists(array $data): bool {
+        $table = static::$table;
+        [$whereClause, $params] = static::buildWhereClause($data);
+
+        return DB::query("SELECT EXISTS (SELECT 1 FROM $table WHERE $whereClause) existed", $params)->fetch()['existed'] === 1;
     }
 
     public static function insert(array $data): PDOStatement {
