@@ -28,10 +28,7 @@ class DB {
         } catch(PDOException $e) {
             require __DIR__ . "/Log.php";
 
-            Log::error("PDO connection failed.", [
-                "error_code" => $e->getCode(),
-                "error_message" => $e->getMessage()
-            ]);
+            Log::error("PDO connection failed.", $e->getMessage());
             http_response_code(502);
             die();
         }

@@ -1,8 +1,13 @@
 <?php declare(strict_types=1);
 
 final class Log {
-    // private const LOG_FILE = 'php://stderr'; // terminal
-    private const LOG_FILE = __DIR__.'/../../storage/system.log'; // file
+    private const TERMINAL = false; // terminal
+
+    private static function getLogFile(): string {
+        if(self::TERMINAL) return 'php://stderr';
+        return __DIR__ . "/../../storage/". date("Y_M_d") . ".log";
+    }
+
 
     private static function log(string $level, mixed ...$message): void {
         global $requestId;
@@ -22,7 +27,7 @@ final class Log {
         );
 
         file_put_contents(
-            self::LOG_FILE,
+            self::getLogFile(),
             $json . PHP_EOL,
             FILE_APPEND | LOCK_EX
         );
