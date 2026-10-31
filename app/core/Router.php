@@ -114,7 +114,7 @@ class Router {
         }
 
         if(strlen($base) > 1) {
-            $path = substr($path, strlen($base));
+            $path = rtrim(substr($path, strlen($base)), '/');
         }
 
         define("BASE_URL", $base);
