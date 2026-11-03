@@ -29,7 +29,7 @@ class Storage {
     public static function save(string $from, string $dest): bool {
         if(
             move_uploaded_file(
-                self::storagePath($from),
+                $from,
                 self::storagePath($dest)
             )
         ) return true;
