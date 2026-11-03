@@ -53,7 +53,7 @@ class Repository {
         return DB::query("SELECT EXISTS (SELECT 1 FROM $table WHERE $whereClause) existed", $params)->fetch()['existed'] === 1;
     }
 
-    public static function insert(array $data): PDOStatement {
+    public static function insert(array $data, bool $returning = false): PDOStatement|array|false {
         $keys = array_keys($data);
         static::assertFillable($keys, 'insert');
 
@@ -61,7 +61,9 @@ class Repository {
         $cols = implode(", ", $keys);
         $params = implode(", ", array_map(fn ($col) => ":$col", $keys));
 
-        return DB::query("INSERT INTO $table ($cols) VALUES ($params)", $data);
+        $res = DB::query("INSERT INTO $table ($cols) VALUES ($params) RETURNING *", $data);
+        if(!$returning) return $res;
+        return $res->fetch();
     }
 
     public static function insertMany(array $data): ?PDOStatement {
